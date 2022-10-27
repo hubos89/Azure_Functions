@@ -25,7 +25,23 @@ if ($Context -lt $AllSubscriptions.length) {
 		$Route_Table_name = $Route_Table_name -split ","
 		#Verify number of subnet name=number of subnet Addr
 		if($Subnet_Addr.Count -eq $Subnet_name.Count){
-			######################################
+			#get the Vnet informations
+			$Vnet = Get-AzVirtualNetwork -Name $Vnet_name -ResourceGroupName $Resource_group
+			$VnetLocation = $Vnet.location
+			$VnetAdressPrefixes = $vnet.AddressSpace.AddressPrefixes
+			for ($i=0; $i -lt $Subnet_name.length; $i++) {
+				$route1 = New-AzRouteConfig -Name "Default" -AddressPrefix 0.0.0.0/0 -NextHopType "VirtualAppliance" -NextHopIpAddress $Route_Table_next_hop
+				$route2 = New-AzRouteConfig -Name "Subnet" -AddressPrefix $Subnet_Addr[$i] -NextHopType "VnetLocal"
+				$RouteList = @($route1, $route2)
+				foreach ($AdressPrefixe in $VnetAdressPrefixes) {
+					$route = New-AzRouteConfig -Name "Vnet" -AddressPrefix $AdressPrefixe -NextHopType "VirtualAppliance" -NextHopIpAddress $Route_Table_next_hop
+					$RouteList = $RouteList + $route
+				}
+				$RouteTable = New-AzRouteTable -Name $Route_Table_name[$i] -ResourceGroupName $Resource_group -Location $VnetLocation -Route $RouteList
+				#Create the subnet with info at position i
+				Add-AzVirtualNetworkSubnetConfig -Name $Subnet_name[$i]  -VirtualNetwork $Vnet -AddressPrefix $Subnet_Addr[$i] -RouteTable $RouteTable
+				#write all the modification in Azure
+				$Vnet | Set-AzVirtualNetwork
 			}
 		}Else{Write-Host "ERROR : not the same number of subnet name and subnet addr"}
 	}Else{Write-Host "ERROR : user interuption at proced level"}
